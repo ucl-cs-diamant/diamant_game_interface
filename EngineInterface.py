@@ -102,8 +102,8 @@ class EngineInterface:
         decisions = {player_id: decisions[i] for i, player_id in enumerate(self.players)}
         return decisions
 
-    def report_outcome(self, winning_players):
-        url = f"http://{self.server_address}:{self.server_port}/report_outcome/"
+    def report_outcome(self, winning_players: list):
+        url = f"http://{self.server_address}:{self.server_port}/matches/{self.game_id}/report_match/"
         _ = requests.post(url, data={'outcome': 'ok', 'winners': winning_players})
         # todo: implement error checking
         exit(0)

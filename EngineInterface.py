@@ -87,9 +87,8 @@ class EngineInterface:
             # handle game abortion
         await self.__start_socket_server()  # todo: make sure socket server is ready before spawning players
         self.__launch_players()
+
         self.ready = True
-        # if self.ready_callback is not None:
-        #     self.ready_callback()
 
     """
     Player side of the interface will answer with a simple json: {"decision": <True/False>}
@@ -119,17 +118,19 @@ class PlayerCommunication:
             if os.path.exists(self.sock_address):
                 raise
 
-    async def __receive_msg(self, player_id):
+    async def __receive_msg(self, player_id=None, reader_obj=None):
+        reader = self.player_comm_channels[player_id][0] if reader_obj is None else reader_obj
+
         bytes_buffer = bytearray()
         bytes_read = 0
         while bytes_read < 4:
-            data = await self.player_comm_channels[player_id][0].recv(1024)
+            data = await reader.recv(1024)
             bytes_read += len(data)
             bytes_buffer.extend(data)
         message_length = int.from_bytes(bytes_buffer[:4], "big")
 
         while bytes_read < message_length:
-            data = await self.player_comm_channels[player_id][0].recv(message_length - bytes_read)
+            data = await reader.recv(message_length - bytes_read)
             bytes_read += len(data)
             bytes_buffer.extend(data)
 
@@ -154,12 +155,11 @@ class PlayerCommunication:
 
         # todo: put in the logic for reading their response
 
-    def __client_connected_cb(self, reader, writer):
+    async def __client_connected_cb(self, reader, writer):
         print(self.sock_address, " - client connected")
 
-        client_identification = reader.read()
+        client_identification = await self.__receive_msg(reader_obj=reader)
 
-        client_identification = json.loads(client_identification)
         self.player_comm_channels[client_identification['player_id']] = (reader, writer)
 
     async def start_socket_server(self):

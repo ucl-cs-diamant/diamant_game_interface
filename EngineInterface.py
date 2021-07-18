@@ -82,11 +82,13 @@ class EngineInterface:
 
     async def init_game(self):
         self.__fetch_match_data()
+
         if not self.__prepare_player_code():
-            pass
-            # handle game abortion
-        await self.__start_socket_server()  # todo: make sure socket server is ready before spawning players
+            pass  # handle game abortion sometime soon
+
+        await self.__start_socket_server()  # make sure socket server is ready before spawning players
         self.__launch_players()
+        await self.player_communication_channel.wait_until_players_connected(len(self.players))
 
         self.ready = True
 
@@ -155,11 +157,14 @@ class PlayerCommunication:
 
         # todo: put in the logic for reading their response
 
+    async def wait_until_players_connected(self, player_count):
+        while len(self.player_comm_channels.keys()) < player_count:
+            await asyncio.sleep(0.05)
+
     async def __client_connected_cb(self, reader, writer):
         print(self.sock_address, " - client connected")
 
         client_identification = await self.__receive_msg(reader_obj=reader)
-
         self.player_comm_channels[client_identification['player_id']] = (reader, writer)
 
     async def start_socket_server(self):

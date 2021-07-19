@@ -38,7 +38,7 @@ class EngineInterface:
                 raise ValueError(f"Unable to connect to {self.server_address}:{self.server_port}")
             if res.status_code == 200:
                 break
-            time.sleep(0.2)
+            time.sleep(0.2)  # make this configurable in the future
         match_data = res.json()
         self.players = match_data["players"]  # todo: check against the actual API. I don't remember what it's like
         self.game_id = match_data["game_id"]

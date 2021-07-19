@@ -111,10 +111,7 @@ class EngineInterface:
             raise Exception("One or more player died")  # handle game abortion sometime soon
 
         await self.player_communication_channel.broadcast_decision_request()
-        decisions = await asyncio.gather(*[self.player_communication_channel.__receive_msg(player_id)
-                                         for player_id in self.players])
-        decisions = {player_id: decisions[i] for i, player_id in enumerate(self.players)}
-        return decisions
+        return await self.player_communication_channel.receive_player_decisions()
 
     def report_outcome(self, winning_players: list):
         url = f"http://{self.server_address}:{self.server_port}/matches/{self.game_id}/report_match/"
@@ -143,9 +140,9 @@ class PlayerCommunication:
             data = await reader.read(5)
             bytes_read += len(data)
             bytes_buffer.extend(data)
-        message_length = int.from_bytes(bytes_buffer[:4], "big")
+        message_length = int.from_bytes(bytes_buffer[:4], "big") + 4
 
-        while bytes_read < message_length + 4:
+        while bytes_read < message_length:
             data = await reader.read(message_length - bytes_read)  # todo: use readexactly
             bytes_read += len(data)
             bytes_buffer.extend(data)
@@ -172,6 +169,13 @@ class PlayerCommunication:
                              for player_id in self.player_comm_channels.keys()])
 
         # todo: put in the logic for reading their response
+
+    async def receive_player_decisions(self):
+        players = self.player_comm_channels.keys()
+        decisions = await asyncio.gather(*[self.__receive_msg(player_id)
+                                         for player_id in players])
+        decisions = {player_id: decisions[i] for i, player_id in enumerate(players)}
+        return decisions
 
     async def wait_until_players_connected(self, player_count):
         while len(self.player_comm_channels.keys()) < player_count:

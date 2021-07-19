@@ -111,8 +111,8 @@ class EngineInterface:
             raise Exception("One or more player died")  # handle game abortion sometime soon
 
         await self.player_communication_channel.broadcast_decision_request()
-        decisions = await asyncio.gather(self.player_communication_channel.__receive_msg(player_id)
-                                         for player_id in self.players)
+        decisions = await asyncio.gather(*[self.player_communication_channel.__receive_msg(player_id)
+                                         for player_id in self.players])
         decisions = {player_id: decisions[i] for i, player_id in enumerate(self.players)}
         return decisions
 
@@ -145,7 +145,7 @@ class PlayerCommunication:
             bytes_buffer.extend(data)
         message_length = int.from_bytes(bytes_buffer[:4], "big")
 
-        while bytes_read < message_length:
+        while bytes_read < message_length + 4:
             data = await reader.read(message_length - bytes_read)  # todo: use readexactly
             bytes_read += len(data)
             bytes_buffer.extend(data)
@@ -168,8 +168,8 @@ class PlayerCommunication:
         await self.__send_message(player_id, {"game_state": {'yep': True}})
 
     async def broadcast_decision_request(self):
-        await asyncio.gather(self.__send_decision_request(player_id)
-                             for player_id in self.player_comm_channels.keys())
+        await asyncio.gather(*[self.__send_decision_request(player_id)
+                             for player_id in self.player_comm_channels.keys()])
 
         # todo: put in the logic for reading their response
 

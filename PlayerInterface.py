@@ -8,11 +8,8 @@ import sys
 class PlayerInterface:
     def __init__(self, decision_callback: Callable):
         if not callable(decision_callback):
-            # raise ValueError("Decision callback not callable, expected callable callback")
             sys.exit("Value Error: decision_callback not callable, expected callable callback")
-
-        self.callback = None
-        self.socket = None
+        self.callback = decision_callback
 
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.connect('/tmp/game.sock')

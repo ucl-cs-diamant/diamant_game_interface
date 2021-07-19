@@ -178,9 +178,10 @@ class PlayerCommunication:
             await asyncio.sleep(0.05)
 
     async def __client_connected_cb(self, reader, writer):
-        print(self.sock_address, " - client connected")
+        # print(self.sock_address, " - client connected")
 
         client_identification = await self.__receive_msg(reader_obj=reader)
+        print(f"{client_identification['player_id']} connected")
         self.player_comm_channels[client_identification['player_id']] = (reader, writer)
 
     async def start_socket_server(self):

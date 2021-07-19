@@ -14,6 +14,7 @@ class PlayerInterface:
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.connect('/tmp/game.sock')
 
+        print(f"[Player {os.environ.get('player_id')}] sending id message...")
         self.__send_message({"player_id": os.environ.get("player_id")})
         # perhaps add ack somewhere here if needed
 

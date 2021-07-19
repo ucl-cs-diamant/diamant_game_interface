@@ -43,7 +43,7 @@ class EngineInterface:
         self.players = match_data["players"]  # todo: check against the actual API. I don't remember what it's like
         self.game_id = match_data["game_id"]
 
-    def __fetch_player_code(self, player_id):
+    def __fetch_player_code(self, player_id: int):
         # self.players_code_directories[player_id] = ''
         url = f"http://{self.server_address}:{self.server_port}/users/{player_id}/latest_code/"
         with requests.get(url) as res:
@@ -70,24 +70,34 @@ class EngineInterface:
 
     def __launch_players(self):
         for player_id in self.players:
-            shutil.copy2("start_player.sh", os.path.join(self.players_code_directories[player_id], "start_player.sh"))
+            shutil.copy2("diamant_game_interface/start_player.sh", os.path.join(self.players_code_directories[player_id].name, "start_player.sh"))
             self.player_processes[player_id] = subprocess.Popen(['/bin/bash', './start_player.sh'],
-                                                                cwd=self.players_code_directories[player_id],
-                                                                env={'player_id': player_id})
+                                                                cwd=self.players_code_directories[player_id].name,
+                                                                env={'player_id': str(player_id)})
+
         # check for players that exited prematurely, terminate game if players exited/crashed
 
     async def __start_socket_server(self):
         self.player_communication_channel = PlayerCommunication()
         await self.player_communication_channel.start_socket_server()
 
+    def check_dead_players(self):
+        dead_players = []
+        for player_id in self.player_processes:
+            if self.player_processes[player_id].poll() is not None:
+                dead_players.append(player_id)
+        return dead_players
+
     async def init_game(self):
         self.__fetch_match_data()
 
         if not self.__prepare_player_code():
-            pass  # handle game abortion sometime soon
+            raise Exception("Unable to get player code")  # handle game abortion sometime soon
 
         await self.__start_socket_server()  # make sure socket server is ready before spawning players
         self.__launch_players()
+        if self.check_dead_players():
+            raise Exception("One or more player died")  # handle game abortion sometime soon
         await self.player_communication_channel.wait_until_players_connected(len(self.players))
 
         self.ready = True
@@ -96,6 +106,9 @@ class EngineInterface:
     Player side of the interface will answer with a simple json: {"decision": <True/False>}
     """
     async def request_decisions(self):
+        if self.check_dead_players():
+            raise Exception("One or more player died")  # handle game abortion sometime soon
+
         await self.player_communication_channel.broadcast_decision_request()
         decisions = await asyncio.gather(self.player_communication_channel.__receive_msg(player_id)
                                          for player_id in self.players)

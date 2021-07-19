@@ -15,7 +15,7 @@ class PlayerInterface:
         self.socket.connect('/tmp/game.sock')
 
         print(f"[Player {os.environ.get('player_id')}] sending id message...")
-        self.__send_message({"player_id": os.environ.get("player_id")})
+        self.__send_message({"player_id": int(os.environ.get("player_id"))})
         # perhaps add ack somewhere here if needed
 
     def start(self):

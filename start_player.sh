@@ -1,5 +1,6 @@
 #!/bin/bash
 
+git clone https://github.com/ucl-cs-diamant/diamant_game_interface
 python3 -m venv venv
 source venv/bin/activate
 

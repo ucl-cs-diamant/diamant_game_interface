@@ -52,6 +52,7 @@ class EngineInterface:
                 player_code_dir = tempfile.TemporaryDirectory()
                 with tempfile.TemporaryFile() as tf:
                     tf.write(res.content)
+                    tf.seek(0)
                     tar = tarfile.open(fileobj=tf)
                     tar.extractall(path=player_code_dir.name)
                 self.players_code_directories[player_id] = player_code_dir
@@ -133,19 +134,19 @@ class PlayerCommunication:
             if os.path.exists(self.sock_address):
                 raise
 
-    async def __receive_msg(self, player_id=None, reader_obj=None):
-        reader = self.player_comm_channels[player_id][0] if reader_obj is None else reader_obj
+    async def __receive_msg(self, player_id: int = None, reader_obj: asyncio.StreamReader = None):
+        reader: asyncio.StreamReader = self.player_comm_channels[player_id][0] if reader_obj is None else reader_obj
 
         bytes_buffer = bytearray()
         bytes_read = 0
         while bytes_read < 4:
-            data = await reader.recv(1024)
+            data = await reader.read(5)
             bytes_read += len(data)
             bytes_buffer.extend(data)
         message_length = int.from_bytes(bytes_buffer[:4], "big")
 
         while bytes_read < message_length:
-            data = await reader.recv(message_length - bytes_read)
+            data = await reader.read(message_length - bytes_read)  # todo: use readexactly
             bytes_read += len(data)
             bytes_buffer.extend(data)
 
@@ -156,7 +157,9 @@ class PlayerCommunication:
         encoded_message = bytearray(message.encode('utf-8'))
         message_length = len(encoded_message)
         encoded_message[0:0] = message_length.to_bytes(4, byteorder='big')
-        self.player_comm_channels[player_id][1].write(encoded_message)
+
+        writer: asyncio.StreamWriter = self.player_comm_channels[player_id][1]  # clean this up
+        writer.write(encoded_message)
         await self.player_comm_channels[player_id][1].drain()
 
     async def __send_decision_request(self, player_id):

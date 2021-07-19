@@ -33,9 +33,9 @@ class EngineInterface:
     def __fetch_match_data(self):
         while True:  # PEP315
             try:
-                res = requests.get(f"http://{self.server_address}:{self.server_port}/requestMatch")
+                res = requests.get(f"http://{self.server_address}:{self.server_port}/request_match/")
             except requests.ConnectionError:
-                raise ValueError(f"{self.server_address}:{self.server_port} is not a valid address")
+                raise ValueError(f"Unable to connect to {self.server_address}:{self.server_port}")
             if res.status_code == 200:
                 break
             time.sleep(0.2)

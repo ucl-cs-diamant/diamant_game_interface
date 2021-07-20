@@ -115,7 +115,7 @@ class EngineInterface:
 
     def report_outcome(self, winning_players: list):
         url = f"http://{self.server_address}:{self.server_port}/matches/{self.game_id}/report_match/"
-        _ = requests.post(url, data={'outcome': 'ok', 'winners': winning_players})
+        _ = requests.post(url, json={'outcome': 'ok', 'winners': winning_players})
         # todo: implement error checking
         exit(0)
 

@@ -15,7 +15,7 @@ import shutil
 # todo: deal with http/https later
 # noinspection HttpUrlsUsage
 class EngineInterface:
-    def __init__(self, server_address, server_port=80, ready_callback=None):
+    def __init__(self, server_address, server_port=80):
         self.players = []
         self.players_code_directories = {}
         self.player_processes = {}
@@ -24,11 +24,7 @@ class EngineInterface:
         self.server_port = server_port
         self.player_communication_channel = None
         self.ready = False
-        # self.ready_callback = ready_callback
-
-    # def set_ready_callback(self, ready_callback: Callable):
-    #     assert callable(ready_callback)
-    #     self.ready_callback = ready_callback
+        self.fetch_match_retry_interval: float = float(os.environ.get("RETRY_INTERVAL", 1.0))
 
     def __fetch_match_data(self):
         while True:  # PEP315
@@ -38,7 +34,7 @@ class EngineInterface:
                 raise ValueError(f"Unable to connect to {self.server_address}:{self.server_port}")
             if res.status_code == 200:
                 break
-            time.sleep(0.2)  # make this configurable in the future
+            time.sleep(self.fetch_match_retry_interval)  # make this configurable in the future
         match_data = res.json()
         self.players = match_data["players"]  # todo: check against the actual API. I don't remember what it's like
         self.game_id = match_data["game_id"]
@@ -71,7 +67,8 @@ class EngineInterface:
 
     def __launch_players(self):
         for player_id in self.players:
-            shutil.copy2("diamant_game_interface/start_player.sh", os.path.join(self.players_code_directories[player_id].name, "start_player.sh"))
+            shutil.copy2("diamant_game_interface/start_player.sh",
+                         os.path.join(self.players_code_directories[player_id].name, "start_player.sh"))
             self.player_processes[player_id] = subprocess.Popen(['/bin/bash', './start_player.sh'],
                                                                 cwd=self.players_code_directories[player_id].name,
                                                                 env={'player_id': str(player_id)})
@@ -106,6 +103,7 @@ class EngineInterface:
     """
     Player side of the interface will answer with a simple json: {"decision": <True/False>}
     """
+
     async def request_decisions(self):
         if self.check_dead_players():
             raise Exception("One or more player died")  # handle game abortion sometime soon
@@ -166,14 +164,14 @@ class PlayerCommunication:
 
     async def broadcast_decision_request(self):
         await asyncio.gather(*[self.__send_decision_request(player_id)
-                             for player_id in self.player_comm_channels.keys()])
+                               for player_id in self.player_comm_channels.keys()])
 
         # todo: put in the logic for reading their response
 
     async def receive_player_decisions(self):
         players = self.player_comm_channels.keys()
         decisions = await asyncio.gather(*[self.__receive_msg(player_id)
-                                         for player_id in players])
+                                           for player_id in players])
         decisions = {player_id: decisions[i] for i, player_id in enumerate(players)}
         return decisions
 

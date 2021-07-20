@@ -69,6 +69,7 @@ class EngineInterface:
         for player_id in self.players:
             shutil.copy2("diamant_game_interface/start_player.sh",
                          os.path.join(self.players_code_directories[player_id].name, "start_player.sh"))
+            # TODO: move git clone into the engine interface/backend. That will save bandwidth and time
             self.player_processes[player_id] = subprocess.Popen(['/bin/bash', './start_player.sh'],
                                                                 cwd=self.players_code_directories[player_id].name,
                                                                 env={'player_id': str(player_id)})

@@ -45,7 +45,7 @@ class EngineInterface:
         with requests.get(url) as res:
             res.raise_for_status()
             if res.status_code == 200:
-                player_code_dir = tempfile.TemporaryDirectory()
+                player_code_dir = tempfile.TemporaryDirectory(dir='/dev/shm')
                 with tempfile.TemporaryFile() as tf:
                     tf.write(res.content)
                     tf.seek(0)

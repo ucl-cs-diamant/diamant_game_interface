@@ -112,9 +112,9 @@ class EngineInterface:
         await self.player_communication_channel.broadcast_decision_request()
         return await self.player_communication_channel.receive_player_decisions()
 
-    def report_outcome(self, winning_players: list):
+    def report_outcome(self, winning_players: list, match_history: list):
         url = f"http://{self.server_address}:{self.server_port}/matches/{self.game_id}/report_match/"
-        _ = requests.post(url, json={'outcome': 'ok', 'winners': winning_players})
+        _ = requests.post(url, json={'outcome': 'ok', 'winners': winning_players, 'match_history': match_history})
         # todo: implement error checking
         exit(0)
 

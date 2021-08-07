@@ -105,11 +105,11 @@ class EngineInterface:
     Player side of the interface will answer with a simple json: {"decision": <True/False>}
     """
 
-    async def request_decisions(self):
+    async def request_decisions(self, game_state):
         if self.check_dead_players():
             raise Exception("One or more player died")  # handle game abortion sometime soon
 
-        await self.player_communication_channel.broadcast_decision_request()
+        await self.player_communication_channel.broadcast_decision_request(game_state)
         return await self.player_communication_channel.receive_player_decisions()
 
     def report_outcome(self, winning_players: list, match_history: list):
@@ -158,13 +158,13 @@ class PlayerCommunication:
         writer.write(encoded_message)
         await self.player_comm_channels[player_id][1].drain()
 
-    async def __send_decision_request(self, player_id):
+    async def __send_decision_request(self, player_id, game_state):
         # self.player_comm_channels[player_id][1].write("PUT SOMETHING RELEVANT HERE")
         # await self.player_comm_channels[player_id][1].drain()
-        await self.__send_message(player_id, {"game_state": {'yep': True}})
+        await self.__send_message(player_id, {"game_state": game_state})
 
-    async def broadcast_decision_request(self):
-        await asyncio.gather(*[self.__send_decision_request(player_id)
+    async def broadcast_decision_request(self, game_state):
+        await asyncio.gather(*[self.__send_decision_request(player_id, game_state)
                                for player_id in self.player_comm_channels.keys()])
 
         # todo: put in the logic for reading their response

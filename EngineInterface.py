@@ -27,17 +27,22 @@ class EngineInterface:
         self.fetch_match_retry_interval: float = float(os.environ.get("RETRY_INTERVAL", 1.0))
 
     def __fetch_match_data(self):
+        attempts = 5
         while True:  # PEP315
             try:
                 res = requests.get(f"http://{self.server_address}:{self.server_port}/request_match/")
+                if res.status_code == 200:
+                    match_data = res.json()
+                    self.players = match_data["players"]
+                    self.game_id = match_data["game_id"]
+                    break
             except requests.ConnectionError:
+                attempts -= 1
+                if attempts > 0:
+                    continue
                 raise ValueError(f"Unable to connect to {self.server_address}:{self.server_port}")
-            if res.status_code == 200:
-                break
-            time.sleep(self.fetch_match_retry_interval)  # make this configurable in the future
-        match_data = res.json()
-        self.players = match_data["players"]  # todo: check against the actual API. I don't remember what it's like
-        self.game_id = match_data["game_id"]
+            finally:
+                time.sleep(self.fetch_match_retry_interval)  # make this configurable in the future
 
     def __fetch_player_code(self, player_id: int):
         # self.players_code_directories[player_id] = ''

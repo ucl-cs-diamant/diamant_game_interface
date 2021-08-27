@@ -43,17 +43,20 @@ class EngineInterface:
         # self.players_code_directories[player_id] = ''
         url = f"http://{self.server_address}:{self.server_port}/users/{player_id}/latest_code/"
         with requests.get(url) as res:
-            res.raise_for_status()
-            if res.status_code == 200:
-                player_code_dir = tempfile.TemporaryDirectory(dir='/dev/shm')
-                with tempfile.TemporaryFile() as tf:
-                    tf.write(res.content)
-                    tf.seek(0)
-                    tar = tarfile.open(fileobj=tf)
-                    tar.extractall(path=player_code_dir.name)
-                self.players_code_directories[player_id] = player_code_dir
-                return
-            raise requests.exceptions.RequestException
+            try:
+                res.raise_for_status()
+                if res.status_code == 200:
+                    player_code_dir = tempfile.TemporaryDirectory(dir='/dev/shm')
+                    with tempfile.TemporaryFile() as tf:
+                        tf.write(res.content)
+                        tf.seek(0)
+                        tar = tarfile.open(fileobj=tf)
+                        tar.extractall(path=player_code_dir.name)
+                    self.players_code_directories[player_id] = player_code_dir
+                    return
+                raise requests.exceptions.RequestException
+            except requests.exceptions as e:
+                raise RuntimeError(e)
 
     def __prepare_player_code(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -91,12 +94,12 @@ class EngineInterface:
         self.__fetch_match_data()
 
         if not self.__prepare_player_code():
-            raise Exception("Unable to get player code")  # handle game abortion sometime soon
+            raise RuntimeError("Unable to get player code")  # handle game abortion sometime soon
 
         await self.__start_socket_server()  # make sure socket server is ready before spawning players
         self.__launch_players()
         if self.check_dead_players():
-            raise Exception("One or more player died")  # handle game abortion sometime soon
+            raise RuntimeError("One or more player died")  # handle game abortion sometime soon
         await self.player_communication_channel.wait_until_players_connected(len(self.players))
 
         self.ready = True
@@ -107,7 +110,7 @@ class EngineInterface:
 
     async def request_decisions(self, game_state):
         if self.check_dead_players():
-            raise Exception("One or more player died")  # handle game abortion sometime soon
+            raise RuntimeError("One or more player died")  # handle game abortion sometime soon
 
         await self.player_communication_channel.broadcast_decision_request(game_state)
         return await self.player_communication_channel.receive_player_decisions()

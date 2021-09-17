@@ -15,10 +15,11 @@ import shutil
 # todo: deal with http/https later
 # noinspection HttpUrlsUsage
 class EngineInterface:
-    def __init__(self, server_address, server_port=80):
+    def __init__(self, server_address: str, server_port: int = 80, decision_timeout: float = 2.0):
         self.players = []
         self.players_code_directories = {}
         self.player_processes = {}
+        self.player_decision_timeout = decision_timeout
         self.game_id = None
         self.server_address = server_address
         self.server_port = server_port
@@ -85,7 +86,7 @@ class EngineInterface:
         # check for players that exited prematurely, terminate game if players exited/crashed
 
     async def __start_socket_server(self):
-        self.player_communication_channel = PlayerCommunication()
+        self.player_communication_channel = PlayerCommunication(self.player_decision_timeout)
         await self.player_communication_channel.start_socket_server()
 
     def check_dead_players(self):
@@ -118,7 +119,13 @@ class EngineInterface:
             raise RuntimeError("One or more player died")  # handle game abortion sometime soon
 
         await self.player_communication_channel.broadcast_decision_request(game_state)
-        return await self.player_communication_channel.receive_player_decisions()
+        decisions = await self.player_communication_channel.receive_player_decisions()
+
+        timed_out_players = [player_id for player_id, decision in decisions.items if "timed_out" in decision]
+        if timed_out_players:
+            print(timed_out_players, f"ha{'ve' if len(timed_out_players) > 1 else 's'} been bad")
+
+        return decisions
 
     def report_outcome(self, winning_players: list, match_history: list):
         url = f"http://{self.server_address}:{self.server_port}/matches/{self.game_id}/report_match/"
@@ -128,9 +135,10 @@ class EngineInterface:
 
 
 class PlayerCommunication:
-    def __init__(self):
+    def __init__(self, decision_timeout: float):
         self.sock_address = '/tmp/game.sock'
         self.player_comm_channels = {}
+        self.player_decision_timeout = decision_timeout
 
         try:
             os.unlink(self.sock_address)
@@ -150,7 +158,7 @@ class PlayerCommunication:
         message_length = int.from_bytes(bytes_buffer[:4], "big") + 4
 
         while bytes_read < message_length:
-            data = await reader.read(message_length - bytes_read)  # todo: use readexactly
+            data = await reader.read(message_length - bytes_read)  # use readexactly?
             bytes_read += len(data)
             bytes_buffer.extend(data)
 
@@ -177,9 +185,15 @@ class PlayerCommunication:
 
         # todo: put in the logic for reading their response
 
+    async def __receive_single_player_decision(self, player_id):
+        try:
+            return await asyncio.wait_for(self.__receive_msg(player_id), self.player_decision_timeout)
+        except asyncio.TimeoutError:
+            return {"timed_out": True}
+
     async def receive_player_decisions(self):
         players = self.player_comm_channels.keys()
-        decisions = await asyncio.gather(*[self.__receive_msg(player_id)
+        decisions = await asyncio.gather(*[self.__receive_single_player_decision(player_id)
                                            for player_id in players])
         decisions = {player_id: decisions[i] for i, player_id in enumerate(players)}
         return decisions

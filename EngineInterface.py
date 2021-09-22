@@ -47,12 +47,13 @@ class EngineInterface:
 
     def __fetch_player_code(self, player_id: int):
         # self.players_code_directories[player_id] = ''
-        url = f"http://{self.server_address}:{self.server_port}/users/{player_id}/latest_code/"
+        url = f"http://{self.server_address}:{self.server_port}/code_list/{player_id}/download/"
         with requests.get(url) as res:
             try:
                 res.raise_for_status()
                 if res.status_code == 200:
                     player_code_dir = tempfile.TemporaryDirectory(dir='/dev/shm')
+                    print(player_code_dir)
                     with tempfile.TemporaryFile() as tf:
                         tf.write(res.content)
                         tf.seek(0)
@@ -98,16 +99,24 @@ class EngineInterface:
 
     async def init_game(self):
         self.__fetch_match_data()
+        print("players in this game:", self.players)
 
+        print("getting player code...")
         if not self.__prepare_player_code():
             raise RuntimeError("Unable to get player code")  # handle game abortion sometime soon
 
+        print("starting socket server...")
         await self.__start_socket_server()  # make sure socket server is ready before spawning players
+
+        print("launching players...")
         self.__launch_players()
         if self.check_dead_players():
             raise RuntimeError("One or more player died")  # handle game abortion sometime soon
+
+        print("waiting for players to connect...")
         await self.player_communication_channel.wait_until_players_connected(len(self.players))
 
+        print("Game ready!")
         self.ready = True
 
     """
@@ -115,6 +124,7 @@ class EngineInterface:
     """
 
     async def request_decisions(self, game_state):
+        print("requesting decision...")
         if self.check_dead_players():
             raise RuntimeError("One or more player died")  # handle game abortion sometime soon
 
@@ -124,11 +134,13 @@ class EngineInterface:
         timed_out_players = [player_id for player_id, decision in decisions.items() if "timed_out" in decision]
         if timed_out_players:
             print(timed_out_players, f"ha{'ve' if len(timed_out_players) > 1 else 's'} been bad")
+            raise RuntimeError("BAD BAD!")
 
         return decisions
 
     def report_outcome(self, winning_players: list, match_history: list):
         url = f"http://{self.server_address}:{self.server_port}/matches/{self.game_id}/report_match/"
+        print(winning_players, match_history)
         _ = requests.post(url, json={'outcome': 'ok', 'winners': winning_players, 'match_history': match_history})
         # todo: implement error checking
         exit(0)
@@ -168,6 +180,7 @@ class PlayerCommunication:
         message = json.dumps(message)
         encoded_message = bytearray(message.encode('utf-8'))
         message_length = len(encoded_message)
+        print(message_length)
         encoded_message[0:0] = message_length.to_bytes(4, byteorder='big')
 
         writer: asyncio.StreamWriter = self.player_comm_channels[player_id][1]  # clean this up
@@ -189,6 +202,7 @@ class PlayerCommunication:
         try:
             return await asyncio.wait_for(self.__receive_msg(player_id), self.player_decision_timeout)
         except asyncio.TimeoutError:
+            print(player_id, "timed out")
             return {"timed_out": True}
 
     async def receive_player_decisions(self):

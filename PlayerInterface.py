@@ -31,7 +31,7 @@ class PlayerInterface:
             data = self.socket.recv(1024)
             bytes_read += len(data)
             bytes_buffer.extend(data)
-        message_length = int.from_bytes(bytes_buffer[:4], "big")
+        message_length = int.from_bytes(bytes_buffer[:4], "big") + 4
 
         while bytes_read < message_length:
             data = self.socket.recv(message_length - bytes_read)

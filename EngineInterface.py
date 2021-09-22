@@ -121,7 +121,7 @@ class EngineInterface:
         await self.player_communication_channel.broadcast_decision_request(game_state)
         decisions = await self.player_communication_channel.receive_player_decisions()
 
-        timed_out_players = [player_id for player_id, decision in decisions.items if "timed_out" in decision]
+        timed_out_players = [player_id for player_id, decision in decisions.items() if "timed_out" in decision]
         if timed_out_players:
             print(timed_out_players, f"ha{'ve' if len(timed_out_players) > 1 else 's'} been bad")
 

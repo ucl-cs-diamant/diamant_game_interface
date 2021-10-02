@@ -46,7 +46,7 @@ class EngineInterface:
 
     def __fetch_player_code(self, player_id: int):
         # self.players_code_directories[player_id] = ''
-        url = f"http://{self.server_address}:{self.server_port}/users/{player_id}/latest_code/"
+        url = f"http://{self.server_address}:{self.server_port}/code_list/{player_id}/download/"
         with requests.get(url) as res:
             try:
                 res.raise_for_status()

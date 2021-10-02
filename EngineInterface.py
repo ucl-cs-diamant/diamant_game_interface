@@ -26,6 +26,21 @@ class EngineInterface:
         self.ready = False
         self.fetch_match_retry_interval: float = float(os.environ.get("RETRY_INTERVAL", 1.0))
 
+    def init_game(self):
+        self.__fetch_match_data()
+
+        if not self.__prepare_player_code():
+            raise RuntimeError("Unable to get player code")  # handle game abortion sometime soon
+
+    async def init_players(self):
+        await self.__start_socket_server()  # make sure socket server is ready before spawning players
+        self.__launch_players()
+        if self.check_dead_players():
+            raise RuntimeError("One or more player died")  # handle game abortion sometime soon
+        await self.player_communication_channel.wait_until_players_connected(len(self.players))
+
+        self.ready = True
+
     def __fetch_match_data(self):
         attempts = 5
         while True:  # PEP315
@@ -95,25 +110,14 @@ class EngineInterface:
                 dead_players.append(player_id)
         return dead_players
 
-    async def init_game(self):
-        self.__fetch_match_data()
-
-        if not self.__prepare_player_code():
-            raise RuntimeError("Unable to get player code")  # handle game abortion sometime soon
-
-        await self.__start_socket_server()  # make sure socket server is ready before spawning players
-        self.__launch_players()
-        if self.check_dead_players():
-            raise RuntimeError("One or more player died")  # handle game abortion sometime soon
-        await self.player_communication_channel.wait_until_players_connected(len(self.players))
-
-        self.ready = True
-
     """
     Player side of the interface will answer with a simple json: {"decision": <True/False>}
     """
 
     async def request_decisions(self, game_state):
+        if not self.ready:
+            await self.init_players()
+
         if self.check_dead_players():
             raise RuntimeError("One or more player died")  # handle game abortion sometime soon
 

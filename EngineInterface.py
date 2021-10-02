@@ -1,4 +1,4 @@
-# from collections.abc import Callable
+from collections.abc import Callable
 import asyncio
 import json
 import os
@@ -12,19 +12,43 @@ import subprocess
 import shutil
 
 
+class BaseEngineInterface:
+    def __init__(self):
+        self.players = []
+
+    def request_decisions(self, game_state):
+        raise NotImplementedError
+
+    def init_game(self):
+        raise NotImplementedError
+
+    async def init_players(self):
+        raise NotImplementedError
+
+    def report_outcome(self, winning_players: list, match_history: list):
+        raise NotImplementedError
+
+
 # todo: deal with http/https later
 # noinspection HttpUrlsUsage
-class EngineInterface:
-    def __init__(self, server_address, server_port=80):
-        self.players = []
+class EngineInterface(BaseEngineInterface):
+    def __init__(self, server_address, server_port):
+        super().__init__()
+        if server_port is None or server_address is None:
+            raise ValueError(
+                f"Missing environment variable{'s' if server_address is None and server_port is None else ''}: " +
+                ', '.join([t[1] for t in [(server_address, 'GAMESERVER_HOST'), (server_port, 'GAMESERVER_PORT')] if
+                           t[0] is None]))
+        self.server_address = server_address
+        self.server_port = server_port
+
         self.players_code_directories = {}
         self.player_processes = {}
         self.game_id = None
-        self.server_address = server_address
-        self.server_port = server_port
+
         self.player_communication_channel = None
         self.ready = False
-        self.fetch_match_retry_interval: float = float(os.environ.get("RETRY_INTERVAL", 1.0))
+        self.fetch_match_retry_interval: float = float(os.environ.get("RETRY_INTERVAL", 2.0))
 
     def init_game(self):
         self.__fetch_match_data()
@@ -115,8 +139,8 @@ class EngineInterface:
     """
 
     async def request_decisions(self, game_state):
-        if not self.ready:
-            await self.init_players()
+        while not self.ready:
+            await asyncio.sleep(0.05)
 
         if self.check_dead_players():
             raise RuntimeError("One or more player died")  # handle game abortion sometime soon
@@ -129,6 +153,30 @@ class EngineInterface:
         _ = requests.post(url, json={'outcome': 'ok', 'winners': winning_players, 'match_history': match_history})
         # todo: implement error checking
         exit(0)
+
+
+class OfflineEngineInterface(BaseEngineInterface):
+    def __init__(self, decision_maker: Callable):
+        super().__init__()
+        self.player_id = 1
+        self.decision_request_callable = decision_maker
+
+    def init_game(self):
+        pass
+
+    def init_players(self):
+        self.players.append(self.player_id)
+
+    def report_outcome(self, winning_players: list, match_history: list):
+        game_summary = {
+            'winnings': [e['content']['chest'] for e in match_history if e['event_type'] == 'player_leaves'][-1],
+            'match_history': match_history}
+        # print([event for event in match_history if event['event_type'] == 'player_pickup'])
+        print(game_summary)
+
+    def request_decisions(self, game_state):
+        # this is a weird dict to fit the return format that EngineInterface uses
+        return {self.player_id: {'decision': self.decision_request_callable(game_state)}}
 
 
 class PlayerCommunication:

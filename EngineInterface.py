@@ -172,7 +172,8 @@ class OfflineEngineInterface(BaseEngineInterface):
             'winnings': [e['content']['chest'] for e in match_history if e['event_type'] == 'player_leaves'][-1],
             'match_history': match_history}
         # print([event for event in match_history if event['event_type'] == 'player_pickup'])
-        print(game_summary)
+        # print(game_summary)
+        return game_summary
 
     def request_decisions(self, game_state):
         # this is a weird dict to fit the return format that EngineInterface uses
